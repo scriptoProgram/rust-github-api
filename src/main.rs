@@ -59,14 +59,11 @@ struct GitHubUserGraphQL {
     location: Option<String>,
     email: Option<String>,
     bio: Option<String>,
-    public_repos: Option<GitHubRepoCount>,
+    repositories: Option<GitHubRepoCount>,
     followers: Option<GitHubFollowerCount>,
     following: Option<GitHubFollowingCount>,
     createdAt: String,
     updatedAt: String,
-    // Campos extendidos con token
-    #[serde(skip_serializing_if = "Option::is_none")]
-    privateRepositories: Option<GitHubRepoCount>,
     #[serde(skip_serializing_if = "Option::is_none")]
     starredRepositories: Option<GitHubRepoCount>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -138,13 +135,12 @@ impl From<GitHubUserGraphQL> for GitHubUser {
             location: user.location,
             email: user.email,
             bio: user.bio,
-            public_repos: user.public_repos.map(|r| r.totalCount).unwrap_or(0),
+            public_repos: user.repositories.map(|r| r.totalCount).unwrap_or(0),
             followers: user.followers.map(|f| f.totalCount).unwrap_or(0),
             following: user.following.map(|f| f.totalCount).unwrap_or(0),
             created_at: user.createdAt,
             updated_at: user.updatedAt,
-            // Campos extendidos
-            private_repos: user.privateRepositories.map(|r| r.totalCount),
+            private_repos: None,
             starred_repos: user.starredRepositories.map(|r| r.totalCount),
             total_commits: user.contributionsCollection.as_ref().map(|c| c.totalCommitContributions),
             total_prs: user.contributionsCollection.as_ref().map(|c| c.totalPullRequestContributions),
@@ -347,7 +343,7 @@ query($username: String!) {
         location
         email
         bio
-        publicRepositories { totalCount }
+        repositories { totalCount }
         followers { totalCount }
         following { totalCount }
         createdAt
@@ -369,8 +365,7 @@ query($username: String!) {
         location
         email
         bio
-        publicRepositories { totalCount }
-        privateRepositories { totalCount }
+        repositories { totalCount }
         followers { totalCount }
         following { totalCount }
         starredRepositories { totalCount }
