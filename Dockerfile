@@ -16,4 +16,4 @@ EXPOSE 8080
 
 ENV PORT=8080
 
-CMD ["./target/release/rust_api"]
+CMD ["/app/target/release/rust_api"]
