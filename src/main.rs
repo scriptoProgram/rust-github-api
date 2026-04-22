@@ -560,19 +560,19 @@ async fn get_github_status(req: HttpRequest) -> HttpResponse {
 }
 
 // POST /api/v1/github/token (para verificar/actualizar token)
+#[derive(Deserialize)]
+struct TokenRequest {
+    token: String,
+}
+
+#[derive(Serialize)]
+struct TokenResponse {
+    mensaje: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    validado: Option<bool>,
+}
+
 async fn set_github_token(req: HttpRequest, body: web::Json<TokenRequest>) -> HttpResponse {
-    #[derive(Deserialize)]
-    struct TokenRequest {
-        token: String,
-    }
-
-    #[derive(Serialize)]
-    struct TokenResponse {
-        mensaje: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        validado: Option<bool>,
-    }
-
     // Nota: El token pasado aquí no se persiste entre reinicios
     // Para uso persistente, usar variable de entorno GITHUB_TOKEN
     build_response(&req, TokenResponse {
