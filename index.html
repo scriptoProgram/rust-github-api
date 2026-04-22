@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>GitHub Explorer · Rust API</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ===== VARIABLES ===== */
+    :root {
+      --bg:        #0a0c10;
+      --surface:   #0f1117;
+      --border:    #1e2430;
+      --accent:    #f97316;
+      --accent2:   #38bdf8;
+      --accent3:   #a78bfa;
+      --green:     #4ade80;
+      --red:       #f87171;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --card:      #111827;
+      --glow:      rgba(249,115,22,.15);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== GRID BG ===== */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(249,115,22,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(249,115,22,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ===== LAYOUT ===== */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      padding: 2.5rem 0 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 1.1rem;
+    }
+
+    .logo-text {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.3rem;
+      letter-spacing: -.02em;
+    }
+
+    .logo-text span { color: var(--accent); }
+
+    .api-badge {
+      font-size: .65rem;
+      padding: .2rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--muted);
+      letter-spacing: .08em;
+    }
+
+    .api-badge.online { border-color: var(--green); color: var(--green); }
+    .api-badge.online::before { content: '● '; }
+
+    /* ===== SEARCH ===== */
+    .search-section {
+      padding: 3rem 0 2rem;
+    }
+
+    .search-label {
+      font-size: .7rem;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: .75rem;
+    }
+
+    .search-label span { color: var(--accent); }
+
+    .search-row {
+      display: flex;
+      gap: .75rem;
+      align-items: stretch;
+    }
+
+    .search-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .85rem 1.2rem;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+
+    .search-input::placeholder { color: var(--muted); }
+
+    .search-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--glow);
+    }
+
+    .search-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      padding: .85rem 1.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: .85rem;
+      cursor: pointer;
+      letter-spacing: .06em;
+      transition: opacity .2s, transform .1s;
+      white-space: nowrap;
+    }
+
+    .search-btn:hover { opacity: .9; }
+    .search-btn:active { transform: scale(.97); }
+    .search-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ===== STATUS BAR ===== */
+    #statusBar {
+      margin-top: 1rem;
+      font-size: .75rem;
+      color: var(--muted);
+      min-height: 1.2rem;
+    }
+
+    #statusBar.error { color: var(--red); }
+    #statusBar.loading { color: var(--accent2); }
+
+    /* ===== CARDS GRID ===== */
+    #results { padding-bottom: 4rem; }
+
+    /* ===== PROFILE CARD ===== */
+    .profile-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 1.75rem;
+      align-items: start;
+      animation: fadeUp .4s ease both;
+    }
+
+    .avatar {
+      width: 90px; height: 90px;
+      border-radius: 50%;
+      border: 2px solid var(--accent);
+      object-fit: cover;
+    }
+
+    .profile-info h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .profile-info .login {
+      color: var(--accent);
+      font-size: .85rem;
+      margin-bottom: .6rem;
+    }
+
+    .profile-info .bio {
+      color: var(--muted);
+      font-size: .82rem;
+      line-height: 1.6;
+      margin-bottom: 1rem;
+    }
+
+    .profile-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem .75rem;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    .profile-meta span { display: flex; align-items: center; gap: .3rem; }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      gap: .75rem;
+      margin-top: 1.5rem;
+      grid-column: 1 / -1;
+    }
+
+    .stat-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: .9rem;
+      text-align: center;
+    }
+
+    .stat-box .val {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: block;
+    }
+
+    .stat-box .lbl {
+      font-size: .65rem;
+      color: var(--muted);
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    /* ===== SECTION HEADER ===== */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+      padding-bottom: .75rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+
+    .section-count {
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    /* ===== REPO GRID ===== */
+    .repos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 1rem;
+    }
+
+    .repo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: .6rem;
+      transition: border-color .2s, transform .2s;
+      animation: fadeUp .4s ease both;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .repo-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .repo-name {
+      font-weight: 600;
+      font-size: .9rem;
+      color: var(--accent2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .repo-desc {
+      font-size: .77rem;
+      color: var(--muted);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .repo-footer {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      font-size: .7rem;
+      color: var(--muted);
+      flex-wrap: wrap;
+    }
+
+    .lang-dot {
+      display: inline-block;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--accent3);
+      margin-right: .25rem;
+    }
+
+    .tag {
+      font-size: .6rem;
+      padding: .15rem .45rem;
+      border-radius: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .tag.fork { border-color: var(--accent3); color: var(--accent3); }
+    .tag.archived { border-color: var(--muted); }
+
+    /* ===== SKELETON ===== */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--border) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.2s infinite;
+      border-radius: 6px;
+    }
+
+    /* ===== API CONFIG ===== */
+    .config-notice {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      font-size: .78rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    .config-notice code {
+      color: var(--accent2);
+      background: var(--bg);
+      padding: .1rem .4rem;
+      border-radius: 4px;
+      font-size: .75rem;
+    }
+
+    /* ===== ANIMATIONS ===== */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: .4rem;
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 600px) {
+      .profile-card { grid-template-columns: 1fr; }
+      .search-row { flex-direction: column; }
+      .search-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <span class="logo-text">GitHub<span>Explorer</span></span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <span class="api-badge" id="apiBadge">checking api...</span>
+        <span class="api-badge" id="tokenBadge">token: –</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <section class="search-section">
+    <div class="search-label">// <span>consultar usuario de github</span></div>
+    <div class="search-row">
+      <input
+        class="search-input"
+        id="usernameInput"
+        type="text"
+        placeholder="ej: torvalds"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="search-btn" id="searchBtn" onclick="buscarUsuario()">BUSCAR →</button>
+    </div>
+    <div id="statusBar"></div>
+  </section>
+
+  <section id="results"></section>
+
+</main>
+
+<script>
+  // ============================================================
+  //  ⚠️  CAMBIA ESTA URL por la URL real de tu API en Railway
+  // ============================================================
+  // const API_BASE = "https://TU-API.railway.app";
+  const API_BASE = "https://rust-github-api-production.up.railway.app";
+  // ============================================================
+
+  const statusBar    = document.getElementById('statusBar');
+  const results      = document.getElementById('results');
+  const searchBtn    = document.getElementById('searchBtn');
+  const apiBadge     = document.getElementById('apiBadge');
+  const tokenBadge   = document.getElementById('tokenBadge');
+
+  // ── Verificar estado de la API al cargar ─────────────────────
+  async function checkApiStatus() {
+    try {
+      const res  = await fetch(`${API_BASE}/api/v1/github/status`);
+      const json = await res.json();
+      apiBadge.textContent  = 'api: online';
+      apiBadge.className    = 'api-badge online';
+      tokenBadge.textContent = json.data?.token_configurado
+        ? 'token: ✓ configurado'
+        : 'token: sin token';
+      tokenBadge.style.color = json.data?.token_configurado ? 'var(--green)' : 'var(--accent)';
+    } catch {
+      apiBadge.textContent = 'api: offline';
+      apiBadge.style.color = 'var(--red)';
+    }
+  }
+
+  // ── Buscar usuario ────────────────────────────────────────────
+  async function buscarUsuario() {
+    const username = document.getElementById('usernameInput').value.trim();
+    if (!username) return;
+
+    setLoading(true);
+    results.innerHTML = '';
+
+    try {
+      // Fetch paralelo: perfil + repos
+      const [userRes, reposRes] = await Promise.all([
+        fetch(`${API_BASE}/api/v1/github/users/${username}`),
+        fetch(`${API_BASE}/api/v1/github/users/${username}/repos`)
+      ]);
+
+      if (!userRes.ok) throw new Error(`Usuario no encontrado (${userRes.status})`);
+
+      const userData  = await userRes.json();
+      const reposData = reposRes.ok ? await reposRes.json() : null;
+
+      renderProfile(userData.data, username);
+      if (reposData?.data) renderRepos(reposData.data);
+
+      setStatus(`✓ ${userData.data?.perfil?.public_repos || 0} repos públicos · cargado en ${new Date().toLocaleTimeString()}`);
+
+    } catch (err) {
+      setStatus(err.message, 'error');
+      results.innerHTML = `
+        <div class="config-notice">
+          ⚠️ No se pudo conectar con la API.<br>
+          Verifica que <code>API_BASE</code> apunte a tu servidor de Railway
+          y que la API esté corriendo.
+        </div>`;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Render perfil ─────────────────────────────────────────────
+  function renderProfile(data, username) {
+    const p = data?.perfil;
+    if (!p) return;
+
+    const langColors = { JavaScript:'#f1e05a', TypeScript:'#3178c6', Python:'#3572A5',
+      Rust:'#dea584', Go:'#00ADD8', Java:'#b07219', 'C++':'#f34b7d', CSS:'#563d7c',
+      HTML:'#e34c26', Ruby:'#701516', Swift:'#fa7343', Kotlin:'#A97BFF', default:'#94a3b8' };
+
+    results.innerHTML = `
+      <div class="profile-card">
+        <img class="avatar" src="${p.avatar_url}" alt="${p.login}" onerror="this.src='https://github.com/identicons/${p.login}.png'"/>
+        <div class="profile-info">
+          <h2>${p.name || p.login}</h2>
+          <div class="login">@${p.login}</div>
+          ${p.bio ? `<div class="bio">${esc(p.bio)}</div>` : ''}
+          <div class="profile-meta">
+            ${p.location    ? `<span>📍 ${esc(p.location)}</span>` : ''}
+            ${p.company     ? `<span>🏢 ${esc(p.company)}</span>`  : ''}
+            ${p.email       ? `<span>✉️ ${esc(p.email)}</span>`    : ''}
+            <span>🔗 <a href="${p.html_url}" target="_blank" style="color:var(--accent2)">${p.html_url}</a></span>
+          </div>
+        </div>
+        <div class="stats-row">
+          ${stat(p.public_repos,   'Repos Públicos')}
+          ${stat(p.followers,      'Seguidores')}
+          ${stat(p.following,      'Siguiendo')}
+          ${p.private_repos  != null ? stat(p.private_repos,  'Repos Privados') : ''}
+          ${p.starred_repos  != null ? stat(p.starred_repos,  'Stars dados')    : ''}
+          ${p.total_commits  != null ? stat(p.total_commits,  'Commits')         : ''}
+          ${p.total_prs      != null ? stat(p.total_prs,      'Pull Requests')   : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  // ── Render repositorios ───────────────────────────────────────
+  function renderRepos(data) {
+    const repos = data?.repositorios || [];
+    if (!repos.length) return;
+
+    const langColors = { JavaScript:'#f1e05a', TypeScript:'#3178c6', Python:'#3572A5',
+      Rust:'#dea584', Go:'#00ADD8', Java:'#b07219', 'C++':'#f34b7d', CSS:'#563d7c',
+      HTML:'#e34c26', Ruby:'#701516', Swift:'#fa7343', Kotlin:'#A97BFF' };
+
+    const html = repos.map((r, i) => `
+      <a class="repo-card" href="${r.html_url}" target="_blank"
+         style="animation-delay:${Math.min(i * 0.04, 0.8)}s">
+        <div class="repo-name">📁 ${esc(r.name)}</div>
+        <div class="repo-desc">${r.description ? esc(r.description) : '<em style="color:var(--border)">sin descripción</em>'}</div>
+        <div class="repo-footer">
+          ${r.language ? `<span><span class="lang-dot" style="background:${langColors[r.language]||'#94a3b8'}"></span>${esc(r.language)}</span>` : ''}
+          <span>⭐ ${r.stargazers_count}</span>
+          <span>🍴 ${r.forks_count}</span>
+          ${r.is_fork     ? '<span class="tag fork">fork</span>'     : ''}
+          ${r.is_archived ? '<span class="tag archived">archived</span>' : ''}
+        </div>
+      </a>
+    `).join('');
+
+    results.insertAdjacentHTML('beforeend', `
+      <div class="section-header">
+        <span class="section-title">Repositorios</span>
+        <span class="section-count">${repos.length} repos</span>
+      </div>
+      <div class="repos-grid">${html}</div>
+    `);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────
+  function stat(val, label) {
+    return `<div class="stat-box"><span class="val">${fmt(val)}</span><span class="lbl">${label}</span></div>`;
+  }
+
+  function fmt(n) {
+    if (n == null) return '–';
+    return n >= 1000 ? (n/1000).toFixed(1)+'k' : n;
+  }
+
+  function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function setLoading(on) {
+    searchBtn.disabled = on;
+    searchBtn.innerHTML = on ? '<span class="spinner"></span>cargando...' : 'BUSCAR →';
+  }
+
+  function setStatus(msg, type = '') {
+    statusBar.textContent = msg;
+    statusBar.className = type;
+  }
+
+  // ── Enter para buscar ─────────────────────────────────────────
+  document.getElementById('usernameInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') buscarUsuario();
+  });
+
+  // ── Init ──────────────────────────────────────────────────────
+  checkApiStatus();
+</script>
+</body>
+</html>
